@@ -1,0 +1,89 @@
+<!doctype html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { background: #222; color: #eee; font-family: sans-serif; }
+    #waterfall { border: 1px solid #444; background: #000; }
+  </style>
+</head>
+<body>
+  <button id="connect">Connect</button>
+  <pre id="log"></pre>
+  <canvas id="waterfall" width="800" height="400"></canvas>
+  <script>
+    const logEl = document.getElementById("log");
+    const log = (m) => (logEl.textContent += m + "\n");
+
+    async function waitIceComplete(pc) {
+      if (pc.iceGatheringState === "complete") return;
+      await new Promise((resolve) => {
+        const h = () => {
+          if (pc.iceGatheringState === "complete") {
+            pc.removeEventListener("icegatheringstatechange", h);
+            resolve();
+          }
+        };
+        pc.addEventListener("icegatheringstatechange", h);
+      });
+    }
+
+    const canvas = document.getElementById('waterfall');
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const bins = 8000;
+    const scale = width / bins;
+    let y = 0;
+
+    // Color mapping for dB value (-128 to 127)
+    function dbToColor(db) {
+      // Normalize to 0..1
+      let norm = (db + /*128*/ 64
+        
+      ) / 255;
+      // Simple blue-yellow-red gradient
+      let r = Math.max(0, 255 * (norm - 0.5) * 2);
+      let g = Math.max(0, 255 * (1 - Math.abs(norm - 0.5) * 2));
+      let b = Math.max(0, 255 * (0.5 - norm) * 2);
+      return `rgb(${r|0},${g|0},${b|0})`;
+    }
+
+    function drawSpectrum(spectrum) {
+      // Scroll canvas down by 1 pixel
+      ctx.drawImage(canvas, 0, 0, width, height - 1, 0, 1, width, height - 1);
+      // Draw new line at top
+      for (let i = 0; i < bins; i++) {
+        ctx.fillStyle = dbToColor(spectrum[i]);
+        ctx.fillRect(i * scale, 0, scale, 1);
+      }
+    }
+
+    document.getElementById("connect").onclick = async () => {
+      const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+      const waterfall = pc.createDataChannel("waterfall");
+      waterfall.binaryType = 'arraybuffer';
+      waterfall.onopen = () => log("waterfall open");
+      waterfall.onclose = () => log("waterfall closed");
+      waterfall.onmessage = (e) => {
+        drawSpectrum(new Int8Array(e.data));
+      };
+
+      // Offer/answer (non-trickle ICE)
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await waitIceComplete(pc);
+
+      const res = await fetch("http://localhost:8000/webrtc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sdp: pc.localDescription.sdp,
+          type: pc.localDescription.type
+        })
+      });
+      const answer = await res.json();
+      await pc.setRemoteDescription(answer);
+      log("Connected.");
+    };
+  </script>
+</body>
