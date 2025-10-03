@@ -83,7 +83,7 @@ async def waterfall_task( channel ):
             # wait until it recovers.
             while channel.bufferedAmount > fft_size * 2:
                 buffer_len = 0
-                asyncio.sleep( 0.001 )
+                await asyncio.sleep( 0.001 )
 
             iq_block = await iq_stream.get()
             buffer[ buffer_len:buffer_len + iq.block_size ] = iq_block
@@ -98,8 +98,14 @@ async def waterfall_task( channel ):
                 # Compute magnitude in dB
                 db = 20 * np.log10( np.abs( fft_out ) + 1e-6 )
 
-                # Clip to int8 range
-                spectrum = np.clip( db, -128, 127 ).astype( np.int8 )
+                # Expected dynamic range: -70 dB to 0 dB
+                min_db, max_db = -15.0, 50.0
+
+                # Normalize into 0–255 (full 8-bit unsigned range)
+                db_norm = (db - min_db) / (max_db - min_db) * 255.0
+
+                # Clip and cast
+                spectrum = np.clip(db_norm, 0, 255).astype(np.uint8)
 
                 # Shift zero frequency to center (optional for plotting)
                 half = len( spectrum ) // 2
@@ -115,7 +121,7 @@ async def waterfall_task( channel ):
 
 @asynccontextmanager
 async def lifespan( app: FastAPI ):
-    task = asyncio.create_task( iq_file_task( "/home/burch/gqrx_20250930_023302_128975000_192000_fc.raw" ) )
+    task = asyncio.create_task( iq_file_task( "gqrx_20250930_023302_128975000_192000_fc.raw" ) )
     yield
 
     task.cancel()
