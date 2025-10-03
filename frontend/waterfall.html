@@ -35,27 +35,81 @@
     const scale = width / bins;
     let y = 0;
 
-    // Color mapping for dB value (-128 to 127)
-    function dbToColor(db) {
-      // Normalize to 0..1
-      let norm = (db + /*128*/ 64
-        
-      ) / 255;
-      // Simple blue-yellow-red gradient
-      let r = Math.max(0, 255 * (norm - 0.5) * 2);
-      let g = Math.max(0, 255 * (1 - Math.abs(norm - 0.5) * 2));
-      let b = Math.max(0, 255 * (0.5 - norm) * 2);
-      return `rgb(${r|0},${g|0},${b|0})`;
+    // Your RGB565 gradient (16-bit values)
+    const GRADIENT_565 = [
+      0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9,
+      0x10, 0x1F, 0x11F, 0x19F, 0x23F, 0x2BF, 0x33F, 0x3BF, 0x43F, 0x4BF,
+      0x53F, 0x5BF, 0x63F, 0x6BF, 0x73F, 0x7FE, 0x7FA, 0x7F5, 0x7F0, 0x7EB,
+      0x7E6, 0x7E2, 0x17E0, 0x3FE0, 0x67E0, 0x8FE0, 0xB7E0, 0xD7E0, 0xFFE0, 0xFFC0,
+      0xFF80, 0xFF20, 0xFEE0, 0xFE80, 0xFE40, 0xFDE0, 0xFDA0, 0xFD40, 0xFD00, 0xFCA0,
+      0xFC60, 0xFC00, 0xFBC0, 0xFB60, 0xFB20, 0xFAC0, 0xFA80, 0xFA20, 0xF9E0, 0xF980,
+      0xF940, 0xF8E0, 0xF8A0, 0xF840, 0xF800, 0xF802, 0xF804, 0xF806, 0xF808, 0xF80A,
+      0xF80C, 0xF80E, 0xF810, 0xF812, 0xF814, 0xF816, 0xF818, 0xF81A, 0xF81C, 0xF81E,
+      0xF81E, 0xF81E, 0xF81E, 0xF83E, 0xF83E, 0xF83E, 0xF83E, 0xF85E, 0xF85E, 0xF85E,
+      0xF85E, 0xF87E, 0xF87E, 0xF83E, 0xF83E, 0xF83E, 0xF83E, 0xF85E, 0xF85E, 0xF85E,
+      0xF85E, 0xF87E, 0xF87E, 0xF87E, 0xF87E, 0xF87E, 0xF87E, 0xF87E, 0xF87E, 0xF87E,
+      0xF87E, 0xF87E, 0xF87E, 0xF87E, 0xF88F, 0xF88F, 0xF88F
+    ];
+
+    // Convert a single RGB565 value to 8-bit per channel RGB
+    function rgb565ToRgb888(c) {
+      const r5 = (c >> 11) & 0x1F;
+      const g6 = (c >> 5)  & 0x3F;
+      const b5 =  c        & 0x1F;
+
+      // Expand to 8-bit (bit replication preserves brightness better than simple scaling)
+      const r = (r5 << 3) | (r5 >> 2);
+      const g = (g6 << 2) | (g6 >> 4);
+      const b = (b5 << 3) | (b5 >> 2);
+      return [r, g, b];
+    }
+
+    // Precompute gradient as RGB888 for speed
+    const GRADIENT_RGB = GRADIENT_565.map(rgb565ToRgb888);
+
+    /**
+    * Map an 8-bit value (0..255) to a CSS rgb(...) string via the gradient.
+    * Uses linear interpolation between nearest gradient stops.
+    */
+    function gradientCssFromByte(v) {
+      // Clamp input
+      const value = Math.max(0, Math.min(255, v|0));
+
+      const last = GRADIENT_RGB.length - 1;        // 122 for your array (123 items)
+      const pos  = (value / 255) * last;           // continuous position in [0, last]
+      const i    = Math.floor(pos);
+      const t    = pos - i;
+
+      if (t === 0 || i === last) {
+        const [r, g, b] = GRADIENT_RGB[i];
+        return `rgb(${r}, ${g}, ${b})`;
+      }
+
+      const [r1, g1, b1] = GRADIENT_RGB[i];
+      const [r2, g2, b2] = GRADIENT_RGB[i + 1];
+
+      const r = Math.round(r1 + (r2 - r1) * t);
+      const g = Math.round(g1 + (g2 - g1) * t);
+      const b = Math.round(b1 + (b2 - b1) * t);
+
+      return `rgb(${r}, ${g}, ${b})`;
     }
 
     function drawSpectrum(spectrum) {
       // Scroll canvas down by 1 pixel
       ctx.drawImage(canvas, 0, 0, width, height - 1, 0, 1, width, height - 1);
+
+      const zoom = 1;
+
+      ctx.save();
+      ctx.translate((width-(width*zoom))/2, 0);
+      ctx.scale(zoom,1);
       // Draw new line at top
       for (let i = 0; i < bins; i++) {
-        ctx.fillStyle = dbToColor(spectrum[i]);
+        ctx.fillStyle = gradientCssFromByte(spectrum[i]);
         ctx.fillRect(i * scale, 0, scale, 1);
       }
+      ctx.restore();
     }
 
     document.getElementById("connect").onclick = async () => {
@@ -65,7 +119,7 @@
       waterfall.onopen = () => log("waterfall open");
       waterfall.onclose = () => log("waterfall closed");
       waterfall.onmessage = (e) => {
-        drawSpectrum(new Int8Array(e.data));
+        drawSpectrum(new Uint8Array(e.data));
       };
 
       // Offer/answer (non-trickle ICE)
