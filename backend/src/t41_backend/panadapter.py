@@ -13,7 +13,7 @@ class RTCWaterfall:
         self._fft_size = fft_size
         self._channel = channel
         self._task = None
-        self._agc = True
+        self._agc = False
 
         # Fixed scaling
         self._fixed_min_db = -15
@@ -98,7 +98,7 @@ class RTCWaterfall:
 
     def scale_fixed(self, db):
         # Normalize into 0–255 (full 8-bit unsigned range)
-        db_norm = (db - self._agc_min_db) / (self._agc_max_db - self._agc_min_db) * 255.0
+        db_norm = (db - self._fixed_min_db) / (self._fixed_max_db - self._fixed_min_db) * 255.0
 
         # Clip and cast
         return np.clip(db_norm, 0, 255).astype(np.uint8)
