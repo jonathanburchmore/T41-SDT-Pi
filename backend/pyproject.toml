@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "t41_backend"
+version = "0.0.1"
+description = "T41-SDT-Pi Backend/Hardware Interface"
+authors = [
+    { name="Jonathan Burchmore", email="burch@offline.org" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "aiofiles",
+    "numpy",
+    "pyfftw",
+    "pydantic",
+    "aiortc"
+]

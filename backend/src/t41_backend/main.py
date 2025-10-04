@@ -8,15 +8,11 @@ import math
 from typing import Set
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration
 from contextlib import asynccontextmanager
+from .models import SDPModel
 
 peers: Set[ RTCPeerConnection ] = set()
-
-class SDPModel( BaseModel ):
-    sdp:    str
-    type:   str
 
 class IQBuffer:
     def __init__( self, block_size=2048 ):
