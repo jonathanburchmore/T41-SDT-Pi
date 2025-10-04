@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration
 from contextlib import asynccontextmanager
-from .models import SDPModel
+from t41_backend.models import SDPModel
 
 peers: Set[ RTCPeerConnection ] = set()
 
