@@ -17,16 +17,16 @@ radio = DummyRadio()
 
 peers: Set[ RTCPeerConnection ] = set()
 
-async def waterfall_task( channel ):
+async def waterfall_task(channel):
     try:        
         fft_size = 8000
 
-        fft_in = pyfftw.empty_aligned( fft_size, dtype='complex64' )
-        fft_out = pyfftw.empty_aligned( fft_size, dtype='complex64' ) 
+        fft_in = pyfftw.empty_aligned(fft_size, dtype='complex64')
+        fft_out = pyfftw.empty_aligned(fft_size, dtype='complex64') 
 
-        fft = pyfftw.FFTW( fft_in, fft_out )
+        fft = pyfftw.FFTW(fft_in, fft_out)
 
-        buffer = np.empty( ( 1 + math.ceil( fft_size / radio.iq.block_size ) ) * radio.iq.block_size, dtype='complex64' )
+        buffer = np.empty((1 + math.ceil(fft_size / radio.iq.block_size)) * radio.iq.block_size, dtype='complex64')
         buffer_len = 0
 
         iq_stream = radio.iq.add_consumer()
@@ -36,20 +36,20 @@ async def waterfall_task( channel ):
             # wait until it recovers.
             while channel.bufferedAmount > fft_size * 2:
                 buffer_len = 0
-                await asyncio.sleep( 0.001 )
+                await asyncio.sleep(0.001)
 
             iq_block = await iq_stream.get()
-            buffer[ buffer_len:buffer_len + radio.iq.block_size ] = iq_block
+            buffer[buffer_len:buffer_len + radio.iq.block_size] = iq_block
             buffer_len += radio.iq.block_size
 
             while buffer_len >= fft_size:
-                fft_in[ : ] = buffer[ :fft_size ]
+                fft_in[:] = buffer[:fft_size]
                 fft()
                 buffer_len -= fft_size
-                buffer[ :buffer_len ] = buffer[ fft_size:fft_size + buffer_len ]
+                buffer[:buffer_len] = buffer[fft_size:fft_size + buffer_len]
 
                 # Compute magnitude in dB
-                db = 20 * np.log10( np.abs( fft_out ) + 1e-6 )
+                db = 20 * np.log10(np.abs(fft_out) + 1e-6)
 
                 # Expected dynamic range: -70 dB to 0 dB
                 min_db, max_db = -15.0, 50.0
@@ -61,44 +61,45 @@ async def waterfall_task( channel ):
                 spectrum = np.clip(db_norm, 0, 255).astype(np.uint8)
 
                 # Shift zero frequency to center (optional for plotting)
-                half = len( spectrum ) // 2
-                shifted = np.empty_like( spectrum )
-                shifted[ :half ] = spectrum[ half: ]
-                shifted[ half: ] = spectrum[ :half ]
+                half = len(spectrum) // 2
+                shifted = np.empty_like(spectrum)
+                shifted[:half] = spectrum[half:]
+                shifted[half:] = spectrum[:half]
 
-                channel.send( shifted.tobytes() )
+                channel.send(shifted.tobytes())
 
-        print( f"Exiting waterfall thread: {channel.state}" )
+        print(f"Exiting waterfall thread: {channel.state}")
     except asyncio.CancelledError:
         pass
 
 @asynccontextmanager
-async def lifespan( app: FastAPI ):
+async def lifespan(app: FastAPI):
     await radio.startup()
     yield
-    await asyncio.gather( *( pc.close() for pc in list( peers ) ), return_exceptions=True )
+    await asyncio.gather(*( pc.close() for pc in list(peers)), return_exceptions=True)
     peers.clear()
     await radio.shutdown()
 
-app = FastAPI( lifespan=lifespan )
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[ "*" ],
+
+    allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=[ "*" ],
-    allow_headers=[ "*" ],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-@app.post( "/webrtc", response_model = SDPModel )
-async def waterfall( sdp: SDPModel ):
+@app.post("/webrtc", response_model=SDPModel)
+async def waterfall(sdp: SDPModel):
     if sdp.type != "offer":
-        raise HTTPException( status_code=400, detail="Expected offer" )
+        raise HTTPException(status_code=400, detail="Expected offer")
     
-    pc = RTCPeerConnection( RTCConfiguration() )
-    peers.add( pc )
+    pc = RTCPeerConnection(RTCConfiguration())
+    peers.add(pc)
 
-    @pc.on( "datachannel" )
-    def on_datachannel( channel ):
+    @pc.on("datachannel")
+    def on_datachannel(channel):
         task = None
         task_fn = None
 
@@ -107,21 +108,21 @@ async def waterfall( sdp: SDPModel ):
 
         if task_fn != None:
             if channel.readyState == "open":
-                task = asyncio.create_task( task_fn( channel ) )
+                task = asyncio.create_task(task_fn(channel))
             else:
-                @channel.on( "open" )
+                @channel.on("open")
                 def on_open():
                     nonlocal task
-                    task = asyncio.create_task( task_fn( channel ) )
+                    task = asyncio.create_task(task_fn(channel))
 
-            @channel.on( "close" )
+            @channel.on("close")
             def on_close():
                 if task and not task.done():
                     task.cancel()
 
-    offer = RTCSessionDescription( sdp=sdp.sdp, type=sdp.type )
-    await pc.setRemoteDescription( offer )
+    offer = RTCSessionDescription(sdp=sdp.sdp, type=sdp.type)
+    await pc.setRemoteDescription(offer)
     answer = await pc.createAnswer()
-    await pc.setLocalDescription( answer )
+    await pc.setLocalDescription(answer)
     
-    return SDPModel( sdp=pc.localDescription.sdp, type=pc.localDescription.type )
+    return SDPModel(sdp=pc.localDescription.sdp, type=pc.localDescription.type)
