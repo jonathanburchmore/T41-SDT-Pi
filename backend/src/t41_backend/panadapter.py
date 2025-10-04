@@ -16,7 +16,7 @@ class RTCWaterfall:
         self._agc = False
 
         # Fixed scaling
-        self._fixed_min_db = -15
+        self._fixed_min_db = -19
         self._fixed_max_db = 50
 
         # AGC
@@ -49,6 +49,7 @@ class RTCWaterfall:
             fft_out = pyfftw.empty_aligned(self._fft_size, dtype='complex64') 
 
             fft = pyfftw.FFTW(fft_in, fft_out)
+            window = np.hanning(self._fft_size)
 
             buffer = np.empty((1 + math.ceil(self._fft_size / self._radio.iq.block_size)) * self._radio.iq.block_size, dtype='complex64')
             buffer_len = 0
@@ -67,8 +68,19 @@ class RTCWaterfall:
                 buffer_len += self._radio.iq.block_size
 
                 while buffer_len >= self._fft_size:
-                    fft_in[:] = buffer[:self._fft_size]
+                    samples = buffer[:self._fft_size]
+
+                    # Remove DC offset
+                    samples = samples - np.mean(samples)
+
+                    # Apply window
+                    samples = samples * window
+
+                    # Perform FFT
+                    fft_in[:] = samples
                     fft()
+
+                    # Rotate used samples out of buffer
                     buffer_len -= self._fft_size
                     buffer[:buffer_len] = buffer[self._fft_size:self._fft_size + buffer_len]
 
@@ -76,15 +88,12 @@ class RTCWaterfall:
                     db = 20 * np.log10(np.abs(fft_out) + 1e-6)
 
                     # Scale
-                    spectrum = self.scale( db )
+                    spectrum = self.scale(db)
 
                     # Shift zero frequency to center
-                    half = len(spectrum) // 2
-                    shifted = np.empty_like(spectrum)
-                    shifted[:half] = spectrum[half:]
-                    shifted[half:] = spectrum[:half]
+                    spectrum = np.fft.fftshift(spectrum)
 
-                    self._channel.send(shifted.tobytes())
+                    self._channel.send(spectrum.tobytes())
 
             print(f"RTCWaterfall::waterfall: exiting with channel readyState {self._channel.readyState}")
         except asyncio.CancelledError:
