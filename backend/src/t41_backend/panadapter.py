@@ -85,6 +85,8 @@ class RTCWaterfall:
                     shifted[half:] = spectrum[:half]
 
                     self._channel.send(shifted.tobytes())
+
+            print(f"RTCWaterfall::waterfall: exiting with channel readyState {self._channel.readyState}")
         except asyncio.CancelledError:
             pass
         except Exception as e:
