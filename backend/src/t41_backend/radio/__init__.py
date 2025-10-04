@@ -1,3 +1,4 @@
-from t41_backend.radio.radio import DummyRadio
+from t41_backend.radio.radio import Radio
+from t41_backend.radio.dummy import DummyRadio
 
-__all__ = ["DummyRadio"]
+__all__ = ["Radio", "DummyRadio"]
