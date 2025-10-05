@@ -39,6 +39,7 @@ class RTCWaterfall:
 
         @channel.on("close")
         async def on_close():
+            print("RTCWaterfall: datachannel on_close")
             if self._task:
                 self._task.cancel()
                 await self._task                           
