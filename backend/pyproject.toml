@@ -14,10 +14,11 @@ requires-python = ">=3.10"
 
 dependencies = [
     "fastapi",
-    "uvicorn[standard]",
+    "fastapi[standard]",
     "aiofiles",
     "numpy",
     "pyfftw",
     "pydantic",
-    "aiortc"
+    "aiortc",
+    "pyee"
 ]
