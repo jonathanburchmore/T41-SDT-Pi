@@ -3,6 +3,7 @@ import aiofiles
 import numpy as np
 
 from t41_backend.radio import Radio
+from t41_backend.events import T41Events
 
 class DummyRadio(Radio):
     def __init__(self):
@@ -12,6 +13,7 @@ class DummyRadio(Radio):
     async def startup(self):
         await super().startup()
         self._tasks["rx_iq"] = asyncio.create_task(self._rx_iq())
+        self._tasks["status"] = asyncio.create_task(self._status())
 
     async def _rx_iq(self):
         try:
@@ -39,3 +41,13 @@ class DummyRadio(Radio):
             pass
         except Exception as e:
             print(f"DummyRadio::rx_iq: Exception: {e}")
+
+    async def _status(self):
+        try:
+            while True:
+                await T41Events.status.emit("iq", sample_rate=self.iq.sample_rate, block_size=self.iq.block_size)
+                await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            print(f"DummyRadio::status: Exception: {e}")

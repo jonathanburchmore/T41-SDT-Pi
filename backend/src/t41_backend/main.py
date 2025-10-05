@@ -1,13 +1,16 @@
 import asyncio
+import json
 
-from typing import Set
+from typing import Set, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration
 from contextlib import asynccontextmanager
-from t41_backend.models import SDPModel
+from t41_backend.models import SDP, EventPayload
 from t41_backend.radio import DummyRadio
 from t41_backend.panadapter import RTCWaterfall
+from t41_backend.events import T41Events
 
 radio = DummyRadio()
 
@@ -31,8 +34,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/webrtc", response_model=SDPModel)
-async def webrtc(sdp: SDPModel):
+@app.post("/webrtc", response_model=SDP)
+async def webrtc(sdp: SDP):
     if sdp.type != "offer":
         raise HTTPException(status_code=400, detail="Expected offer")
     
@@ -49,4 +52,83 @@ async def webrtc(sdp: SDPModel):
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
     
-    return SDPModel(sdp=pc.localDescription.sdp, type=pc.localDescription.type)
+    return SDP(sdp=pc.localDescription.sdp, type=pc.localDescription.type)
+
+@app.get("/events/human")
+async def human_events():
+    stream = T41Events.human.stream()
+
+    async def event_stream():
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(stream.get(), 15)
+
+                    lines = [f"event: {item['event']}"]
+                    if item.get("kwargs"):
+                        lines.append(f"data: {json.dumps(item['kwargs'])}")
+                    yield "\n".join(lines) + "\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+                except asyncio.CancelledError:
+                    break
+        finally:
+            T41Events.human.end_stream(stream)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+@app.post("/events/human/{event}")
+async def emit_human_event(event: str, payload: Optional[EventPayload]=None):
+    kwargs = payload.model_dump() if payload else {}
+    await T41Events.human.emit(event, **kwargs)
+
+@app.get("/events/command")
+async def command_events():
+    stream = T41Events.command.stream()
+
+    async def event_stream():
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(stream.get(), 15)
+
+                    lines = [f"event: {item['event']}"]
+                    if item.get("kwargs"):
+                        lines.append(f"data: {json.dumps(item['kwargs'])}")
+                    yield "\n".join(lines) + "\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+                except asyncio.CancelledError:
+                    break
+        finally:
+            T41Events.command.end_stream(stream)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+@app.post("/events/command/{event}")
+async def post_command_event(event: str, payload: Optional[EventPayload]=None):
+    kwargs = payload.model_dump() if payload else {}
+    await T41Events.command.emit(event, **kwargs)
+
+@app.get("/events/status")
+async def command_events():
+    stream = T41Events.status.stream()
+
+    async def event_stream():
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(stream.get(), 15)
+
+                    lines = [f"event: {item['event']}"]
+                    if item.get("kwargs"):
+                        lines.append(f"data: {json.dumps(item['kwargs'])}")
+                    yield "\n".join(lines) + "\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+                except asyncio.CancelledError:
+                    break
+        finally:
+            T41Events.status.end_stream(stream)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
