@@ -1,6 +1,7 @@
 import asyncio
 
 from abc import ABC, abstractmethod
+from .menu import MainMenu
 
 class IQBuffer:
     def __init__(self, sample_rate=192000, block_size=2048):
@@ -26,11 +27,14 @@ class Radio(ABC):
     def __init__(self, sample_rate=192000):
         self.iq = IQBuffer(sample_rate=sample_rate)
         self._tasks = {}
+        self._menu = MainMenu()
 
     async def startup(self):
-        pass
+        await self._menu.startup()
 
     async def shutdown(self):
+        await self._menu.shutdown()
+
         for task in self._tasks.values():
             task.cancel()
             await task
