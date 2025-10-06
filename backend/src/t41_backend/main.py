@@ -8,9 +8,8 @@ from fastapi.responses import StreamingResponse
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration
 from contextlib import asynccontextmanager
 from t41_backend.models import SDP, EventPayload
-from t41_backend.radio import DummyRadio
+from t41_backend.radio import DummyRadio, RadioEvents
 from t41_backend.panadapter import RTCWaterfall
-from t41_backend.events import T41Events
 
 radio = DummyRadio()
 
@@ -56,7 +55,7 @@ async def webrtc(sdp: SDP):
 
 @app.get("/events/human")
 async def human_events():
-    stream = T41Events.human.stream()
+    stream = RadioEvents.human.stream()
 
     async def event_stream():
         try:
@@ -73,18 +72,18 @@ async def human_events():
                 except asyncio.CancelledError:
                     break
         finally:
-            T41Events.human.end_stream(stream)
+            RadioEvents.human.end_stream(stream)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 @app.post("/events/human/{event}")
 async def emit_human_event(event: str, payload: Optional[EventPayload]=None):
     kwargs = payload.model_dump() if payload else {}
-    await T41Events.human.emit(event, **kwargs)
+    await RadioEvents.human.emit(event, **kwargs)
 
 @app.get("/events/command")
 async def command_events():
-    stream = T41Events.command.stream()
+    stream = RadioEvents.command.stream()
 
     async def event_stream():
         try:
@@ -101,18 +100,18 @@ async def command_events():
                 except asyncio.CancelledError:
                     break
         finally:
-            T41Events.command.end_stream(stream)
+            RadioEvents.command.end_stream(stream)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 @app.post("/events/command/{event}")
 async def post_command_event(event: str, payload: Optional[EventPayload]=None):
     kwargs = payload.model_dump() if payload else {}
-    await T41Events.command.emit(event, **kwargs)
+    await RadioEvents.command.emit(event, **kwargs)
 
 @app.get("/events/status")
 async def command_events():
-    stream = T41Events.status.stream()
+    stream = RadioEvents.status.stream()
 
     async def event_stream():
         try:
@@ -129,6 +128,6 @@ async def command_events():
                 except asyncio.CancelledError:
                     break
         finally:
-            T41Events.status.end_stream(stream)
+            RadioEvents.status.end_stream(stream)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

@@ -2,8 +2,8 @@ import asyncio
 import aiofiles
 import numpy as np
 
-from t41_backend.radio import Radio
-from t41_backend.events import T41Events
+from .radio import Radio
+from .events import RadioEvents
 
 class DummyRadio(Radio):
     def __init__(self):
@@ -45,7 +45,7 @@ class DummyRadio(Radio):
     async def _status(self):
         try:
             while True:
-                await T41Events.status.emit("iq", sample_rate=self.iq.sample_rate, block_size=self.iq.block_size)
+                await RadioEvents.status.emit("iq", sample_rate=self.iq.sample_rate, block_size=self.iq.block_size)
                 await asyncio.sleep(5)
         except asyncio.CancelledError:
             pass

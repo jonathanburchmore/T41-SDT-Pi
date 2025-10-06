@@ -3,7 +3,7 @@ import asyncio
 from pyee.asyncio import AsyncIOEventEmitter
 from types import SimpleNamespace
 
-class T41EventEmitter:
+class RadioEventEmitter:
     def __init__(self):
         self._emitter = AsyncIOEventEmitter()
         self._streams = set()
@@ -51,8 +51,8 @@ class T41EventEmitter:
     def remove_listener(self, event, f):
         return self._emitter.remove_listener(event, f)
 
-T41Events = SimpleNamespace(
-    human=T41EventEmitter(),
-    command=T41EventEmitter(),
-    status=T41EventEmitter()
+RadioEvents = SimpleNamespace(
+    human=RadioEventEmitter(),
+    command=RadioEventEmitter(),
+    status=RadioEventEmitter()
 )
