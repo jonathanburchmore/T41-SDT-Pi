@@ -77,6 +77,11 @@ class RTCWaterfall:
                     # Apply window
                     samples = samples * window
 
+                    # Shift up by 48kHz
+                    n = np.arange(len(samples), dtype=np.float32)
+                    phase = np.exp(1j * 2 * np.pi * 48_000 * n / self._radio.iq.sample_rate).astype(np.complex64)
+                    samples = samples * phase
+
                     # Perform FFT
                     fft_in[:] = samples
                     await asyncio.to_thread(fft)
