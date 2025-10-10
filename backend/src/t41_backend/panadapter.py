@@ -16,8 +16,8 @@ class RTCWaterfall:
         self._agc = False
 
         # Fixed scaling
-        self._fixed_min_db = -19
-        self._fixed_max_db = 50
+        self._fixed_min_db = 180
+        self._fixed_max_db = 240
 
         # AGC
         self._agc_history_len = 50          # number of frames to remember
