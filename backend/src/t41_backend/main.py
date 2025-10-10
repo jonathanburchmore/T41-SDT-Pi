@@ -8,10 +8,10 @@ from fastapi.responses import StreamingResponse
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration
 from contextlib import asynccontextmanager
 from t41_backend.models import SDP, EventPayload
-from t41_backend.radio import DummyRadio, RadioEvents
+from t41_backend.radio import MCHStreamer, RadioEvents
 from t41_backend.panadapter import RTCWaterfall
 
-radio = DummyRadio()
+radio = MCHStreamer(sample_rate=96000)
 
 peers: Set[RTCPeerConnection] = set()
 
