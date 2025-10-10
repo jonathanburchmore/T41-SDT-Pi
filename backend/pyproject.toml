@@ -20,5 +20,6 @@ dependencies = [
     "pyfftw",
     "pydantic",
     "aiortc",
-    "pyee"
+    "pyee",
+    "sounddevice"
 ]
