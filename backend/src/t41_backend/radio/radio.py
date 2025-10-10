@@ -22,6 +22,14 @@ class IQBuffer:
                 
             await queue.put(block)
 
+    def put_nowait(self, block):
+        for queue in self.queues:
+            if queue.full():
+                # Discard oldest block
+                _ = queue.get_nowait()
+                
+            queue.put_nowait(block)
+
 
 class Radio(ABC):
     def __init__(self, sample_rate=192000):
