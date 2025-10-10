@@ -79,7 +79,7 @@ class RTCWaterfall:
 
                     # Perform FFT
                     fft_in[:] = samples
-                    fft()
+                    await asyncio.to_thread(fft)
 
                     # Rotate used samples out of buffer
                     buffer_len -= self._fft_size
